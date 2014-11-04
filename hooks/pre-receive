@@ -1,0 +1,181 @@
+#!/bin/sh
+ 
+debugging="false"
+
+debug_message()
+{
+  if [ $debugging = "true" ]; then
+    echo $1 $2 $3 $4 $5 $6 $7 $8 $9
+  fi
+}
+
+output_false_topic_branch_name()
+{
+  echo "Topicbranch Beispiel:"
+  echo " - usr/mk/MeinFeature"
+  echo " - usr/rl/SQL"
+  echo
+}
+
+while read oldrev newrev refname
+do
+  # --- Arguments
+  #oldrev=$(git rev-parse $1)
+  #newrev=$(git rev-parse $2)
+  #refname="$3"
+
+  debug_message
+  debug_message "Details:"
+  debug_message "-----------------------------------------------------------"
+  debug_message "Old revision " $oldrev
+  debug_message "New revision " $newrev
+  debug_message "Refname " $refname
+  debug_message "-----------------------------------------------------------"
+  debug_message
+
+  # --- Clarifications
+  # oldrev could be 0s which means creating refname
+  # newrev could be 0s which means deleting refname
+
+  isadmin=$(git config --bool user.isadmin)
+  if [ -z "$isadmin" ]; then
+    isadmin="false"
+  fi
+
+  debug_message "Administratorrechte: " $isadmin
+  debug_message
+
+  fail=0
+  
+  if [ $isadmin = "true" ]; then # admin incoming
+    debug_message "-> Skip validation"
+  elif [ ${refname:0:10} = "refs/tags/" ]; then
+    debug_message "-> Skip validation: push tags "
+  else
+      case "$refname" in
+        refs/heads/*)
+          branch=$(expr "$refname" : "refs/heads/\(.*\)")
+          topicbranch=$(expr "$branch" : "\(usr/.*/.*\)")
+        
+          debug_message "branch: " $branch 
+          debug_message "topicbranch: " $topicbranch
+          
+          if [ 0 -ne $(expr "$newrev" : "0*$") ]; then
+            ##################################
+            #         deleting branch        #
+            ##################################
+            
+            if [ -z "$topicbranch" ]; then # no topic branch
+              echo
+              echo "Branch $branch ist kein topicbranch: Löschen nicht möglich"
+              output_false_topic_branch_name
+              fail=1
+            else
+              debug_message "-> Deleting topic branch $branch"
+            fi
+          elif [ 0 -ne $(expr "$oldrev" : "0*$") ]; then # creating branch
+            ##################################
+            #         creating branch        #
+            ##################################
+
+            if [ -z "$topicbranch" ]; then # no topic branch
+              echo
+              echo "Branch $branch ist kein topicbranch: Erstellen nicht möglich"
+              output_false_topic_branch_name
+              fail=1
+            else
+              debug_message "-> Creating topic branch $topicbranch"
+
+              topicbranchroot=${topicbranch:0:4}
+              debug_message "topic branch root: $topicbranchroot"
+              
+              if [ "$topicbranchroot" = "usr/" ]; then # topic branches have to start with usr
+                topicbranchuser=${topicbranch:4:2}
+                debug_message "user topic branch: $topicbranchuser"                 
+                
+                regexuser="$(expr "$topicbranchuser" : '[a-z][a-z]')"
+                if [ 0 -ne $regexuser ]; then
+                  debug_message "-> Good user topic branchname"
+                else
+                  echo "Ungültige topic branch Bezeichnung"
+                  output_false_topic_branch_name
+                  fail=1
+                fi
+              else
+                echo "Branch $branch hat einen falschen Rootbranch"               
+                output_false_topic_branch_name
+                fail=1
+              fi
+            fi
+          else 
+            ##################################
+            #         updating branch        #
+            ##################################
+            debug_message "-> Validating commits for root branch"
+              
+            mergebase="$(git merge-base $oldrev $newrev)"
+            
+            if [ "" != "$topicbranch" ]; then
+              fail=0
+            elif [ "$oldrev" != "$mergebase" ]; then
+              echo
+              echo "Für $refname ist nur ein fast-forward update erlaubt!"
+              fail=1
+            else
+              commits="$(git rev-list $oldrev..$newrev)"
+                
+              for commit in $commits
+              do
+                message="$(git log --format=%s -1 $commit)"                 
+                regexticket="$(expr "$message" : '<[a-z][a-z]-[0-9]*>.*')"
+                regexfix="$(expr "$message" : '.*<fix>$')"
+                regexnew="$(expr "$message" : '.*<new>$')"
+                regexchg="$(expr "$message" : '.*<chg>$')"
+                regexmerge="$(expr "$message" : 'Merge branch.*')"
+                  
+                debug_message
+                debug_message "------------------------------------"
+                debug_message "Msg: " "$(git log --format=%s -1 $commit)"
+                debug_message "regex-count-ticket: " $regexticket
+                debug_message "regex-count-fix: " $regexfix
+                debug_message "regex-count-new: " $regexnew
+                debug_message "regex-count-chg: " $regexchg
+                debug_message "regex-count-merge: " $regexmerge
+                  
+                if [ 0 -ne $regexticket -o 0 -ne $regexfix -o 0 -ne $regexnew -o 0 -ne $regexchg -o 0 -ne $regexmerge ] ; then
+                  debug_message "-> Commit korrekt"
+                else
+                  echo
+                  echo "Ungültiger commit:"
+                  echo "  Commit: $commit"
+                  echo "  Message: $message"
+                  echo
+                  fail=1
+                 fi
+              done
+            fi
+          fi
+          ;;
+        refs/tags/*)
+          fail=0
+          ;;
+        *)
+          fail=1
+          echo >&2 "***pre-receive hook does not understand ref $refname in this repository. ***"
+          echo >&2 "*** Contact the repository administrator. ***"
+          ;;
+      esac
+  fi
+done
+
+if [ 0 -ne $fail ]; then
+  echo 
+  echo -e "\e[31m*** Vorgang abgebrochen ***\e[0m"
+  echo 
+  exit 1
+else
+  echo 
+  debug_message "Vorgang erfolgreich beendet!"
+  debug_message ""
+  exit 0
+fi
