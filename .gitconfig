@@ -1,14 +1,30 @@
+[core]
+  editor = 'C:/Program Files (x86)/Notepad++/notepad++.exe'
+  autocrlf = false
+[user]
+  name = Markus Kellenbenz
+  email = "(none)"
+[push]
+  default = simple
 [alias]
   ec = config --global -e
   up = !git fetch --all --prune --tags && git pull --rebase --prune $@ && git submodule update --init --recursive
   dt = difftool
-  cm = !git add -A && git commit -m
+  cm = !git add -A && git commit
   save = !git add -A && git commit -m 'SAVEPOINT'
   undo = reset HEAD~1 --mixed
-  amend = commit -a --amend
+  amend = !git add -A && git commit --amend
   s = status -sb
   hist = log --branches --decorate --oneline --graph -10
   changed = show --name-only
   co = checkout
   cob = checkout -b
   unstage = '!git stash show $1 -p | git apply --reverse'
+  wipe = !git reset --hard && git clean -f -d
+  housekeeping = !git reflog expire --all --expire=now && git gc --prune=now --aggressive
+[merge]
+  tool = p4merge
+[mergetool]
+  cmd = "p4merge.exe $BASE $LOCAL $REMOTE $MERGED"
+  trustExitCode = true
+  keepBackup = false
