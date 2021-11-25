@@ -1,18 +1,14 @@
 [core]
-  editor = 'C:/Program Files (x86)/Notepad++/notepad++.exe'
-  autocrlf = false
+	editor = \"C:\\Users\\markus.ammann\\AppData\\Local\\Programs\\Microsoft VS Code\\bin\\code\" --wait
 [user]
-  name = Markus Kellenbenz
-  email = "(none)"
-[push]
-  default = simple
+	name = Markus Ammann
+	email = markus.ammann@avanade.com
 [alias]
   ec = config --global -e
   up = !git fetch --all --prune --tags && git pull --rebase --prune $@ && git submodule update --init --recursive
-  dt = difftool
-  cm = !git add -A && git commit
   save = !git add -A && git commit -m 'SAVEPOINT'
   undo = reset HEAD~1 --mixed
+  cp = "!f() { git add -A && git commit -m \"$@\" && git push; }; f"
   amend = !git add -A && git commit --amend
   s = status -sb
   hist = log --branches --decorate --oneline --graph -10
@@ -20,11 +16,5 @@
   co = checkout
   cob = checkout -b
   unstage = '!git stash show $1 -p | git apply --reverse'
-  wipe = !git reset --hard && git clean -f -d
+  wipe = !git reset --hard && git clean -f -d -x
   housekeeping = !git reflog expire --all --expire=now && git gc --prune=now --aggressive
-[merge]
-  tool = p4merge
-[mergetool]
-  cmd = "p4merge.exe $BASE $LOCAL $REMOTE $MERGED"
-  trustExitCode = true
-  keepBackup = false
